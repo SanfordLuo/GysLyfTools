@@ -64,17 +64,29 @@ class RunAsinRank(object):
         """
         self.driver.quit()
 
-    def open_home_and_change_zipcode(self):
+    def open_home_and_change_zipcode(self, zipcode):
         """
         打开首页
         :return:
         """
-        logger.info("open_home begin")
 
         for _idx in range(3):
+            logger.info(f"open_home begin, {_idx}")
+
             try:
                 url = "https://www.amazon.com/"
                 self.driver.get(url)
+                time.sleep(self.wait_time)
+
+                # 检测邮编是否更新成功
+                try:
+                    element = self.driver.find_element(By.XPATH, '//*[@id="glow-ingress-line2"]')
+                    element_text = element.text
+                    if zipcode in element_text:
+                        logger.info("change_zipcode success")
+                        return True
+                except Exception as error:
+                    logger.error("change_zipcode error")
 
                 # 有时候进了首页不显示改邮编,需要点一下这个
                 try:
@@ -109,10 +121,16 @@ class RunAsinRank(object):
         logger.info("change_zipcode begin")
 
         try:
-            button = WebDriverWait(self.driver, self.wait_time).until(
-                ec.visibility_of_element_located((By.XPATH, '//input[@data-action-type="SELECT_LOCATION"]')))
-            button.click()
-            time.sleep(self.wait_time)
+            try:
+                button = WebDriverWait(self.driver, self.wait_time).until(
+                    ec.visibility_of_element_located((By.XPATH, '//input[@data-action-type="SELECT_LOCATION"]')))
+                button.click()
+                time.sleep(self.wait_time)
+            except Exception as error:
+                button = WebDriverWait(self.driver, self.wait_time).until(
+                    ec.visibility_of_element_located((By.XPATH, '//*[@id="glow-ingress-line2"]')))
+                button.click()
+                time.sleep(self.wait_time)
 
             button = WebDriverWait(self.driver, self.wait_time).until(
                 ec.visibility_of_element_located((By.XPATH, '//input[@id="GLUXZipUpdateInput"]')))
@@ -129,6 +147,14 @@ class RunAsinRank(object):
                 ec.presence_of_element_located((By.XPATH, '//*[@id="GLUXConfirmClose"]')))
             self.driver.execute_script("arguments[0].click();", button)
             time.sleep(self.wait_time)
+
+            try:
+                button = WebDriverWait(self.driver, self.wait_time).until(
+                    ec.presence_of_element_located((By.XPATH, '//*[@name="glowDoneButton"]')))
+                button.click()
+                time.sleep(self.wait_time)
+            except Exception as error:
+                logger.error("glowDoneButton error.")
 
             # 检测邮编是否更新成功
             element = self.driver.find_element(By.XPATH, '//*[@id="glow-ingress-line2"]')
@@ -240,7 +266,7 @@ class RunAsinRank(object):
             return False
 
         # 打开首页并且更改邮编
-        is_success = self.open_home_and_change_zipcode()
+        is_success = self.open_home_and_change_zipcode(zipcode)
         if not is_success:
             return False
 
@@ -268,8 +294,8 @@ class RunAsinRank(object):
 
 
 if __name__ == '__main__':
-    zipcode = "77429"
-    keywords = "pack and play mattress"
-    total_page_nums = 6
+    _zipcode = "77429"
+    _keywords = "pack and play mattress"
+    _total_page_nums = 6
     obj = RunAsinRank()
-    obj.run_asin(zipcode, keywords, total_page_nums)
+    obj.run_asin(_zipcode, _keywords, _total_page_nums)
