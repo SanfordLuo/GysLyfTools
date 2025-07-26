@@ -27,6 +27,8 @@ class RunAsinRank(object):
 
         try:
             chrome_options = Options()
+            # 启用无头模式
+            chrome_options.add_argument("--headless")
             # 禁止自动化检测
             chrome_options.add_argument("--disable-blink-features=AutomationControlled")
             # 添加无痕模式选项
