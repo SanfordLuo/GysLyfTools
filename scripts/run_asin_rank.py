@@ -28,7 +28,7 @@ class RunAsinRank(object):
         logger.info("init_driver begin")
 
         try:
-            temp_user_data_dir = "/path/to/temp/user_data"
+            temp_user_data_dir = "/var/log/user_data"
             if os.path.exists(temp_user_data_dir):
                 shutil.rmtree(temp_user_data_dir)
 
