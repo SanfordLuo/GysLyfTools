@@ -5,7 +5,7 @@
 """
 import time
 import os
-import shutil
+import uuid
 from loguru import logger
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -28,9 +28,9 @@ class RunAsinRank(object):
         logger.info("init_driver begin")
 
         try:
-            temp_user_data_dir = "/var/log/user_data"
-            if os.path.exists(temp_user_data_dir):
-                shutil.rmtree(temp_user_data_dir)
+            temp_user_data_dir = f"/var/log/chrome_options/user_data_{int(time.time())}_{uuid.uuid4()}"
+            if not os.path.exists(temp_user_data_dir):
+                os.makedirs(temp_user_data_dir, exist_ok=True)
 
             chrome_options = Options()
             # 明确指定用户数据目录, 服务器不加会报错
