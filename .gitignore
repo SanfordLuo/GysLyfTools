@@ -1,0 +1,17 @@
+.DS_Store
+*.log
+*.svn
+.idea*
+.idea/*
+*.pyc
+*.class
+*.out
+*.xls
+*.xlsx
+*.csv
+*.iml
+*nohup.*
+doc/*
+tags
+test/*
+pylib3/*
