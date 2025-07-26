@@ -4,6 +4,8 @@
 @Desc    :   跑商品排名
 """
 import time
+import os
+import shutil
 from loguru import logger
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -26,7 +28,13 @@ class RunAsinRank(object):
         logger.info("init_driver begin")
 
         try:
+            temp_user_data_dir = "/path/to/temp/user_data"
+            if os.path.exists(temp_user_data_dir):
+                shutil.rmtree(temp_user_data_dir)
+
             chrome_options = Options()
+            # 明确指定用户数据目录, 服务器不加会报错
+            chrome_options.add_argument(f"--user-data-dir={temp_user_data_dir}")
             # 启用无头模式
             chrome_options.add_argument("--headless")
             # 禁止自动化检测
