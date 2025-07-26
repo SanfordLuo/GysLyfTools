@@ -28,15 +28,11 @@ class RunAsinRank(object):
         logger.info("init_driver begin")
 
         try:
-            temp_user_data_dir = f"/var/log/chrome_options/user_data"
-            if not os.path.exists(temp_user_data_dir):
-                os.makedirs(temp_user_data_dir, exist_ok=True)
-
             chrome_options = Options()
-            # 明确指定用户数据目录, 服务器不加会报错
-            chrome_options.add_argument(f"--user-data-dir={temp_user_data_dir}")
             # 启用无头模式
             chrome_options.add_argument("--headless")
+            # 无头模式时需要添加 no-sandbox
+            chrome_options.add_argument("--no-sandbox")
             # 禁止自动化检测
             chrome_options.add_argument("--disable-blink-features=AutomationControlled")
             # 添加无痕模式选项
