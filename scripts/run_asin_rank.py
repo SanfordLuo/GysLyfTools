@@ -29,6 +29,8 @@ class RunAsinRank(object):
 
         try:
             temp_user_data_dir = f"/var/log/chrome_options/user_data"
+            if not os.path.exists(temp_user_data_dir):
+                os.makedirs(temp_user_data_dir, exist_ok=True)
 
             chrome_options = Options()
             # 明确指定用户数据目录, 服务器不加会报错
