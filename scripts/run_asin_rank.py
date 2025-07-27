@@ -3,16 +3,19 @@
 @Time    :   2025/7/26 21:53
 @Desc    :   跑商品排名
 """
+import os
 import time
+import datetime
 from loguru import logger
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 from urllib.parse import urljoin, urlencode, urlparse
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 import selenium.webdriver.support.expected_conditions as ec
-
-logger.add("run_asin_rank.log")
 
 
 class RunAsinRank(object):
@@ -291,46 +294,159 @@ class RunAsinRank(object):
         all_asin_dict = {}
         is_success = self.init_driver()
         if not is_success:
-            self.quit_driver()
             return all_asin_dict
 
         # 打开首页并且更改邮编
         is_success = self.open_home_and_change_zipcode(zipcode)
         if not is_success:
-            self.quit_driver()
             return all_asin_dict
 
         # 搜索关键词
         all_asin_dict = {}
         sponsored_dict, organic_dict = self.search_keywords(keywords)
+        if not sponsored_dict:
+            return all_asin_dict
         all_asin_dict["1"] = {
             "sponsored_dict": sponsored_dict,
             "organic_dict": organic_dict
         }
-        if not sponsored_dict:
-            self.quit_driver()
-            return all_asin_dict
 
         # 后面的太多, 只要广告位
         for idx in range(1, total_page_nums):
             page_num = idx + 1
             sponsored_dict, organic_dict = self.search_keywords_next(page_num)
+            if not sponsored_dict:
+                return all_asin_dict
             all_asin_dict[str(page_num)] = {
                 "sponsored_dict": sponsored_dict,
                 "organic_dict": organic_dict
             }
-            if not sponsored_dict:
-                self.quit_driver()
-                return all_asin_dict
 
         logger.info(f"all_asin_dict: {all_asin_dict}")
-        self.quit_driver()
         return all_asin_dict
+
+    def save_excel(self, all_asin_dict, xlsx_file):
+        """
+        保存
+        :return:
+        """
+        data = {
+            "rank": [],
+            "asin": []
+        }
+        save_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        data["rank"].append(f"   ")
+        data["asin"].append(f"   ")
+        data["rank"].append(f"执行时间")
+        data["asin"].append(save_time)
+
+        for _page, _page_data in all_asin_dict.items():
+            data["rank"].append(f"   ")
+            data["asin"].append(f"   ")
+            data["rank"].append(f"第{_page}页")
+            data["asin"].append(f"广告位")
+            sponsored_dict = _page_data.get("sponsored_dict", {})
+            for _rank, _asin in sponsored_dict.items():
+                data["rank"].append(_rank)
+                data["asin"].append(_asin)
+
+            data["rank"].append(f"   ")
+            data["asin"].append(f"   ")
+            data["rank"].append(f"第{_page}页")
+            data["asin"].append(f"自然位")
+            organic_dict = _page_data.get("organic_dict", {})
+            for _rank, _asin in organic_dict.items():
+                data["rank"].append(_rank)
+                data["asin"].append(_asin)
+
+        sheet_name = str(datetime.datetime.now().hour)
+
+        # 将数据转换为DataFrame
+        df = pd.DataFrame(data)
+
+        # 检查文件是否存在
+        if not os.path.exists(xlsx_file):
+            # 文件不存在 - 创建新文件并写入数据
+            df.to_excel(xlsx_file, sheet_name=sheet_name, index=False)
+            logger.info(f"文件 '{xlsx_file}' 已创建，数据写入工作表 '{sheet_name}'")
+        else:
+            # 文件存在 - 处理工作表
+            try:
+                # 加载工作簿
+                book = load_workbook(xlsx_file)
+
+                # 检查工作表是否存在
+                if sheet_name in book.sheetnames:
+                    logger.info(f"工作表 '{sheet_name}' 已存在，将在现有数据右侧空一列后添加新数据")
+
+                    # 获取目标工作表
+                    ws = book[sheet_name]
+
+                    # 确定新数据的起始列（现有最大列 + 2，中间空一列）
+                    if ws.max_column > 0:
+                        start_col = ws.max_column + 2  # 空一列
+                    else:
+                        start_col = 1  # 如果工作表为空，从第一列开始
+
+                    # 写入列标题（第一行）
+                    for c_idx, col_name in enumerate(df.columns, start_col):
+                        ws.cell(row=1, column=c_idx, value=col_name)
+
+                    # 写入数据（从第二行开始）
+                    for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=False), 2):
+                        for c_idx, value in enumerate(row, start_col):
+                            ws.cell(row=r_idx, column=c_idx, value=value)
+
+                    # 保存工作簿
+                    book.save(xlsx_file)
+                    logger.info(f"成功在 '{sheet_name}' 工作表右侧空一列后添加 {len(df)} 列数据")
+
+                else:
+                    # 工作表不存在 - 创建新工作表并写入数据
+                    # 使用pandas写入新工作表
+                    with pd.ExcelWriter(xlsx_file, mode='a', engine='openpyxl') as writer:
+                        df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    logger.info(f"工作表 '{sheet_name}' 不存在，已创建并写入数据")
+
+            except Exception as e:
+                logger.info(f"操作失败: {str(e)}")
+                # 回退方案
+                try:
+                    # 尝试使用pandas直接追加新工作表
+                    with pd.ExcelWriter(xlsx_file, mode='a', engine='openpyxl') as writer:
+                        df.to_excel(writer, sheet_name=sheet_name, index=False)
+                    logger.info("使用回退方案成功写入数据")
+                except Exception as fallback_error:
+                    logger.info(f"回退方案也失败: {str(fallback_error)}")
+
+    def main_run(self, zipcode, keywords, total_page_nums, xlsx_file):
+        """
+        入口
+        :return:
+        """
+        all_asin_dict = self.run_asin(zipcode, keywords, total_page_nums)
+        self.quit_driver()
+
+        status = "failed"
+        if all_asin_dict:
+            self.save_excel(all_asin_dict, xlsx_file)
+            status = "success"
+
+        logger.info(f"======== finish: {status} ========")
 
 
 if __name__ == '__main__':
     _zipcode = "77429"
     _keywords = "pack and play mattress"
+
+    os_path = "/var/log"
+
+    log_file = os_path + "/run_asin_rank_{time:YYYY-MM-DD}.log"
+    logger.add(os_path + "/run_asin_rank_{time:YYYY-MM-DD}.log", rotation="00:00", retention="3 days")
+
+    today_str = datetime.datetime.now().strftime("%Y%m%d")
+    _xlsx_file = os_path + f"/{_keywords}_{_zipcode}_{today_str}.xlsx"
+
     _total_page_nums = 3
     obj = RunAsinRank()
-    obj.run_asin(_zipcode, _keywords, _total_page_nums)
+    obj.main_run(_zipcode, _keywords, _total_page_nums, _xlsx_file)
