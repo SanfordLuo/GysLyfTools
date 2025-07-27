@@ -33,7 +33,7 @@ class RunAsinRank(object):
         try:
             chrome_options = Options()
 
-            # 基础配置
+            # 基础配置, --disable-dev-shm-usage 和 --no-sandbox 参数，这是无头模式在Linux服务器稳定运行的关键配置
             chrome_options.add_argument("--headless")
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")  # 关键解决内存问题
