@@ -73,8 +73,8 @@ class RunAsinRank(object):
             logger.info(f"open_home begin, {_idx}")
 
             try:
-                url = "https://www.amazon.com/"
-                # url = "https://www.amazon.com/errors/validateCaptcha"
+                # url = "https://www.amazon.com/"
+                url = "https://www.amazon.com/errors/validateCaptcha"
                 self.driver.get(url)
                 time.sleep(self.wait_time)
 
