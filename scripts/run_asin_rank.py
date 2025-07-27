@@ -7,7 +7,7 @@ import time
 import os
 import uuid
 from loguru import logger
-from amazoncaptcha import AmazonCaptcha
+from urllib.parse import urljoin, urlencode, urlparse
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -76,6 +76,7 @@ class RunAsinRank(object):
 
             try:
                 url = "https://www.amazon.com/"
+                url = "https://www.amazon.com/errors/validateCaptcha"
                 self.driver.get(url)
                 time.sleep(self.wait_time)
 
@@ -92,14 +93,27 @@ class RunAsinRank(object):
                 # 如果有validateCaptcha
                 if "validateCaptcha" in self.driver.current_url:
                     try:
-                        captcha_link = self.driver.page_source.split('<img src="')[1].split('">')[0]
-                        captcha = AmazonCaptcha.fromlink(captcha_link)
-                        solution = captcha.solve()
-                        self.driver.find_element(By.ID, "captchacharacters").send_keys(solution)
-                        time.sleep(self.wait_time)
-                        button = self.driver.find_element(By.CLASS_NAME, "a-button-text")
-                        button.click()
-                        time.sleep(self.wait_time)
+                        if len(self.driver.current_url.split("?")) == 1:
+                            form_action = "/errors/validateCaptcha"
+                            element = self.driver.find_element(By.XPATH, f'//*[@action="{form_action}"]')
+                            inputs = element.find_elements(By.TAG_NAME, 'input')
+                            params = {}
+                            for input_elem in inputs:
+                                name = input_elem.get_attribute('name')
+                                value = input_elem.get_attribute('value')
+                                if name and value:
+                                    params[name] = value
+                            base_url = self.driver.current_url
+                            full_url = urljoin(base_url, form_action)
+                            parsed_url = urlparse(full_url)
+                            captcha_link = parsed_url._replace(query=urlencode(params)).geturl()
+                            logger.info(f"captcha_link: {captcha_link}")
+                            self.driver.get(captcha_link)
+                            time.sleep(self.wait_time)
+                        if "validateCaptcha" in self.driver.current_url:
+                            button = self.driver.find_element(By.CLASS_NAME, "a-button-text")
+                            button.click()
+                            time.sleep(self.wait_time)
                     except Exception as error:
                         logger.error(f"validateCaptcha error: {error}")
 
