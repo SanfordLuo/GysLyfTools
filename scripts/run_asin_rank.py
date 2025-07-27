@@ -4,8 +4,6 @@
 @Desc    :   跑商品排名
 """
 import time
-import os
-import uuid
 from loguru import logger
 from urllib.parse import urljoin, urlencode, urlparse
 from selenium import webdriver
@@ -290,14 +288,17 @@ class RunAsinRank(object):
         return {}, {}
 
     def run_asin(self, zipcode, keywords, total_page_nums):
+        all_asin_dict = {}
         is_success = self.init_driver()
         if not is_success:
-            return False
+            self.quit_driver()
+            return all_asin_dict
 
         # 打开首页并且更改邮编
         is_success = self.open_home_and_change_zipcode(zipcode)
         if not is_success:
-            return False
+            self.quit_driver()
+            return all_asin_dict
 
         # 搜索关键词
         all_asin_dict = {}
@@ -306,6 +307,9 @@ class RunAsinRank(object):
             "sponsored_dict": sponsored_dict,
             "organic_dict": organic_dict
         }
+        if not sponsored_dict:
+            self.quit_driver()
+            return all_asin_dict
 
         # 后面的太多, 只要广告位
         for idx in range(1, total_page_nums):
@@ -315,10 +319,12 @@ class RunAsinRank(object):
                 "sponsored_dict": sponsored_dict,
                 "organic_dict": organic_dict
             }
-
-        self.quit_driver()
+            if not sponsored_dict:
+                self.quit_driver()
+                return all_asin_dict
 
         logger.info(f"all_asin_dict: {all_asin_dict}")
+        self.quit_driver()
         return all_asin_dict
 
 
