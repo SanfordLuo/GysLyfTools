@@ -6,8 +6,9 @@
 import os
 import time
 import datetime
-from loguru import logger
+import random
 import pandas as pd
+from loguru import logger
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from urllib.parse import urljoin, urlencode, urlparse
@@ -31,26 +32,31 @@ class RunAsinRank(object):
 
         try:
             chrome_options = Options()
-            # 启用无头模式
-            chrome_options.add_argument("--headless")
-            # 无头模式时需要添加 no-sandbox
-            chrome_options.add_argument("--no-sandbox")
-            # 禁止自动化检测
-            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-            # 添加无痕模式选项
-            chrome_options.add_argument("--incognito")
-            # 禁用扩展
-            chrome_options.add_argument("--disable-extensions")
 
-            # 自定义 User-Agent
-            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+            # 基础配置
+            chrome_options.add_argument("--headless")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")  # 关键解决内存问题
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--incognito")
+
+            # 高级防检测
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+
+            # 自定义UA
+            chrome_version = random.randint(120, 137)
+            user_agent = f"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{chrome_version}.0.0.0 Safari/537.36"
             chrome_options.add_argument(f'user-agent={user_agent}')
 
+            # 初始化驱动
             self.driver = webdriver.Chrome(options=chrome_options)
-            # 最大化
-            self.driver.maximize_window()
-            self.driver.set_page_load_timeout(60)
-            self.driver.set_script_timeout(60)
+            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+
+            # 超时设置
+            self.driver.set_page_load_timeout(30)
+            self.driver.set_script_timeout(20)
 
             logger.info("init_driver success")
             return True
