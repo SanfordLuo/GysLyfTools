@@ -430,13 +430,16 @@ class RunAsinRank(object):
         入口
         :return:
         """
-        all_asin_dict = self.run_asin(zipcode, keywords, total_page_nums)
-        self.quit_driver()
-
         status = "failed"
-        if all_asin_dict:
-            self.save_excel(all_asin_dict, xlsx_file)
-            status = "success"
+        for _idx in range(3):
+            logger.info(f"main_run idx: {_idx}")
+            all_asin_dict = self.run_asin(zipcode, keywords, total_page_nums)
+            self.quit_driver()
+
+            if all_asin_dict:
+                self.save_excel(all_asin_dict, xlsx_file)
+                status = "success"
+                break
 
         logger.info(f"======== finish: {status} ========")
 
