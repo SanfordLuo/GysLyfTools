@@ -7,6 +7,7 @@ import time
 import os
 import uuid
 from loguru import logger
+from amazoncaptcha import AmazonCaptcha
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -87,6 +88,20 @@ class RunAsinRank(object):
                         return True
                 except Exception as error:
                     logger.error("change_zipcode error")
+
+                # 如果有validateCaptcha
+                if "validateCaptcha" in self.driver.current_url:
+                    try:
+                        captcha_link = self.driver.page_source.split('<img src="')[1].split('">')[0]
+                        captcha = AmazonCaptcha.fromlink(captcha_link)
+                        solution = captcha.solve()
+                        self.driver.find_element(By.ID, "captchacharacters").send_keys(solution)
+                        time.sleep(self.wait_time)
+                        button = self.driver.find_element(By.CLASS_NAME, "a-button-text")
+                        button.click()
+                        time.sleep(self.wait_time)
+                    except Exception as error:
+                        logger.error(f"validateCaptcha error: {error}")
 
                 # 有时候进了首页不显示改邮编,需要点一下这个
                 try:
@@ -296,6 +311,6 @@ class RunAsinRank(object):
 if __name__ == '__main__':
     _zipcode = "77429"
     _keywords = "pack and play mattress"
-    _total_page_nums = 6
+    _total_page_nums = 3
     obj = RunAsinRank()
     obj.run_asin(_zipcode, _keywords, _total_page_nums)
