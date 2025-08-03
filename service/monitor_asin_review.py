@@ -10,6 +10,7 @@ import logging
 import datetime
 from lxml import etree
 from curl_cffi import requests
+from urllib.parse import urljoin
 from utils.logger import config_log
 from utils.feishu import send_fs_msg
 from setting.global_setting import GlobalSetting
@@ -62,6 +63,38 @@ class MonitorAsinReview(object):
         }
         session.proxies = proxies
 
+    def request_validate_captcha(self, url, session, response):
+        """
+        :return:
+        """
+        resp_text = response.text
+        doc = etree.HTML(resp_text)
+        form_actions = doc.xpath('//form/@action')
+        validate_action = ""
+        for action in form_actions:
+            if "errors/validateCaptcha" in action:
+                validate_action = action
+                break
+
+        if validate_action:
+            try:
+                form = doc.xpath(f'//form[@action="{validate_action}"]')[0]
+                input_dict = {}
+                for input_tag in form.xpath('.//input'):
+                    name = input_tag.get('name')
+                    value = input_tag.get('value')
+                    input_dict[name] = value
+                validate_url = urljoin(url, validate_action)
+
+                logging.info(f"[request_validate_captcha request]: {validate_url}, {input_dict}")
+
+                response = session.get(url, params=input_dict, timeout=self.timeout, verify=False)
+                logging.info(f"[request_validate_captcha response]: {response.status_code}. {response.url}")
+            except Exception as error:
+                logging.exception(f"[request_validate_captcha error]: {error}")
+
+        return response
+
     def request_asin_review(self, asin):
         """
         搜索商品
@@ -77,13 +110,18 @@ class MonitorAsinReview(object):
                     self.set_headers(session)
                     # self.set_proxy(session)
                     response = session.get(url, timeout=self.timeout, verify=False)
-                    logging.info(f"[request_asin_review response]: {response.status_code}")
+                    logging.info(f"[request_asin_review response]: {response.status_code}. {response.url}")
 
                     if response.status_code == 404:
                         logging.info(f"商品不存在")
                         return False, url, "商品不存在"
+
                     elif response.status_code == 200:
-                        return True, url, response.text
+                        response = self.request_validate_captcha(url, session, response)
+
+                        doc = etree.HTML(response.text)
+                        if doc.xpath('//*[@id="acrCustomerReviewText"]'):
+                            return True, url, response.text
 
             except Exception as error:
                 logging.exception(f"[request_asin_review error]: {error}")
@@ -186,13 +224,16 @@ class MonitorAsinReview(object):
 
         logging.info(f"is_update: {is_update}")
 
-        if is_update:
-            send_fs_msg(msg_dict)
+        # if is_update:
+        send_fs_msg(msg_dict)
 
 
 if __name__ == '__main__':
     config_log("monitor_asin_review.log")
 
+    # 别人
+    # _asin = "B0FBRM728Y"
+    # 喵喵
     _asin = "B0F7Y61Q6X"
 
     obj = MonitorAsinReview()
