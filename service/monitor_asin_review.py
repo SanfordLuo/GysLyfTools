@@ -4,18 +4,25 @@
 @Desc    :   监控商品评论
 https://www.amazon.com/dp/B0FBRM728Y
 """
+import json
 import socket
 import logging
+import datetime
 from lxml import etree
 from curl_cffi import requests
 from utils.logger import config_log
 from utils.feishu import send_fs_msg
+from setting.global_setting import GlobalSetting
 
 
 class MonitorAsinReview(object):
     def __init__(self):
+        self.setting = GlobalSetting.instance()
+        self.redis_db_0 = self.setting.redis_db_0
         self.timeout = 10
         self.retry = 3
+        self.cache_stats_review_key = "STATS:REVIEW:{asin}"
+        self.cache_stats_review_exp = 60 * 60 * 24
 
     def set_headers(self, session):
         """
@@ -95,6 +102,7 @@ class MonitorAsinReview(object):
         # 评分
         try:
             rating = doc.xpath('//*[@id="acrPopover"]/span[1]/a/span/text()')[0].strip()
+            rating = float(rating)
             logging.info(f"rating: {rating}")
         except Exception as error:
             logging.exception(f"评分解析失败: {error}")
@@ -109,19 +117,57 @@ class MonitorAsinReview(object):
 
         return rating, reviews
 
+    def update_cache_review(self, asin, rating, reviews):
+        """
+        :return:
+        """
+        is_update = False
+        cache_key = self.cache_stats_review_key.format(asin=asin)
+
+        review_data = {}
+        for _idx in range(2):
+            try:
+                cache_value = self.redis_db_0.get(cache_key)
+                logging.info(f"get_cache_review. cache_key: {cache_key}, cache_value: {cache_value}")
+                if cache_value:
+                    review_data = json.loads(cache_value)
+                break
+            except Exception as error:
+                logging.exception(f"get_cache_review error: {error}")
+
+        if review_data.get("rating", 0) != rating or review_data.get("reviews", 0) != reviews:
+            is_update = True
+            new_review_data = {
+                "rating": rating,
+                "reviews": reviews,
+                "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            cache_value = json.dumps(new_review_data)
+            for _idx in range(2):
+                try:
+                    self.redis_db_0.setex(name=cache_key, value=cache_value, time=self.cache_stats_review_exp)
+                    logging.info(f"set_cache_review. cache_key: {cache_key}, cache_value: {cache_value}")
+                    break
+                except Exception as error:
+                    logging.exception(f"set_cache_review error: {error}")
+
+        return is_update
+
     def run_monitor(self, asin):
         """
         入口
         :param asin:
         :return:
         """
+        is_update = False
         rating, reviews = 0, 0
         msg_status = "success"
 
         resp_tag, asin_url, resp_text = self.request_asin_review(asin)
         if resp_tag:
             rating, reviews = self.parse_review(resp_text)
-            if rating is None and reviews is None:
+            is_update = self.update_cache_review(asin, rating, reviews)
+            if not rating or not reviews:
                 msg_status = "未解析到评论信息"
         else:
             msg_status = resp_text
@@ -137,13 +183,17 @@ class MonitorAsinReview(object):
                 "主机名称": socket.gethostname()
             }
         }
-        send_fs_msg(msg_dict)
+
+        logging.info(f"is_update: {is_update}")
+
+        if is_update:
+            send_fs_msg(msg_dict)
 
 
 if __name__ == '__main__':
-    config_log("run_asin_rank.log")
+    config_log("monitor_asin_review.log")
 
-    _asin = "B0FBRM728Y"
+    _asin = "B0F7Y61Q6X"
 
     obj = MonitorAsinReview()
     obj.run_monitor(_asin)

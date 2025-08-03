@@ -42,7 +42,7 @@ def send_fs_msg(msg_dict):
                 session.verify = False
                 session.headers = {"Content-Type: application/json"}
                 logging.info(f"发送飞书请求: {url}, {msg_dict}")
-                response = session.post(url=url, json=data, timeout=(5, 15))
+                response = session.post(url=url, json=data, timeout=10, verify=False)
                 logging.info(f"发送飞书响应:{response.status_code} {response.reason} {response.content}")
                 response_dict = response.json()
                 if response.status_code == 200 and response_dict.get("StatusMessage").__contains__("success"):
