@@ -7,8 +7,8 @@ import os
 import time
 import datetime
 import random
+import logging
 import pandas as pd
-from loguru import logger
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from urllib.parse import urljoin, urlencode, urlparse
@@ -17,6 +17,8 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 import selenium.webdriver.support.expected_conditions as ec
+from utils.config import DATA_PATH
+from utils.logger import config_log
 
 
 class RunAsinRank(object):
@@ -28,7 +30,7 @@ class RunAsinRank(object):
         """
         :return:
         """
-        logger.info("init_driver begin")
+        logging.info("init_driver begin")
 
         try:
             chrome_options = Options()
@@ -58,11 +60,11 @@ class RunAsinRank(object):
             self.driver.set_page_load_timeout(30)
             self.driver.set_script_timeout(20)
 
-            logger.info("init_driver success")
+            logging.info("init_driver success")
             return True
 
         except Exception as error:
-            logger.exception(f"init_driver error: {error}")
+            logging.exception(f"init_driver error: {error}")
 
         return False
 
@@ -79,7 +81,7 @@ class RunAsinRank(object):
         """
 
         for _idx in range(3):
-            logger.info(f"open_home begin, {_idx}")
+            logging.info(f"open_home begin, {_idx}")
 
             try:
                 # url = "https://www.amazon.com/"
@@ -92,10 +94,10 @@ class RunAsinRank(object):
                     element = self.driver.find_element(By.XPATH, '//*[@id="glow-ingress-line2"]')
                     element_text = element.text
                     if zipcode in element_text:
-                        logger.info("change_zipcode success")
+                        logging.info("change_zipcode success")
                         return True
                 except Exception as error:
-                    logger.error("change_zipcode error")
+                    logging.error("change_zipcode error")
 
                 # 如果有validateCaptcha
                 if "validateCaptcha" in self.driver.current_url:
@@ -114,7 +116,7 @@ class RunAsinRank(object):
                             full_url = urljoin(base_url, form_action)
                             parsed_url = urlparse(full_url)
                             captcha_link = parsed_url._replace(query=urlencode(params)).geturl()
-                            logger.info(f"captcha_link: {captcha_link}")
+                            logging.info(f"captcha_link: {captcha_link}")
                             self.driver.get(captcha_link)
                             time.sleep(self.wait_time)
                         if "validateCaptcha" in self.driver.current_url:
@@ -122,7 +124,7 @@ class RunAsinRank(object):
                             button.click()
                             time.sleep(self.wait_time)
                     except Exception as error:
-                        logger.error(f"validateCaptcha error: {error}")
+                        logging.error(f"validateCaptcha error: {error}")
 
                 # 有时候进了首页不显示改邮编,需要点一下这个
                 try:
@@ -131,13 +133,13 @@ class RunAsinRank(object):
                     button.click()
                     time.sleep(self.wait_time)
                 except Exception as error:
-                    logger.info(f"no nav_bb_logo")
+                    logging.info(f"no nav_bb_logo")
 
                 # 检测首页进入后是否有修改地址的地方
                 WebDriverWait(self.driver, self.wait_time).until(
                     ec.visibility_of_element_located((By.XPATH, '//*[@id="nav-global-location-popover-link"]')))
 
-                logger.info("open_home success")
+                logging.info("open_home success")
 
                 # 更改邮编
                 is_success = self.change_zipcode(zipcode)
@@ -145,7 +147,7 @@ class RunAsinRank(object):
                     return True
 
             except Exception as error:
-                logger.exception(f"open_home error: {error}")
+                logging.exception(f"open_home error: {error}")
 
         return False
 
@@ -154,7 +156,7 @@ class RunAsinRank(object):
         更改邮编
         :return:
         """
-        logger.info("change_zipcode begin")
+        logging.info("change_zipcode begin")
 
         try:
             try:
@@ -190,17 +192,17 @@ class RunAsinRank(object):
                 button.click()
                 time.sleep(self.wait_time)
             except Exception as error:
-                logger.error("glowDoneButton error.")
+                logging.error("glowDoneButton error.")
 
             # 检测邮编是否更新成功
             element = self.driver.find_element(By.XPATH, '//*[@id="glow-ingress-line2"]')
             element_text = element.text
             if zipcode in element_text:
-                logger.info("change_zipcode success")
+                logging.info("change_zipcode success")
                 return True
 
         except Exception as error:
-            logger.exception(f"change_zipcode error: {error}")
+            logging.exception(f"change_zipcode error: {error}")
 
         return False
 
@@ -217,14 +219,13 @@ class RunAsinRank(object):
                 ec.presence_of_element_located((By.XPATH, '//div[@role="listitem" and @data-index]')))
             divs = self.driver.find_elements(By.XPATH, '//div[@role="listitem" and @data-index]')
             for _div in divs:
-                print(_div)
                 # 判断是否是 Sponsored 的
                 sponsored_span = None
                 try:
                     sponsored_span = _div.find_element(
                         By.XPATH, './/span[@aria-label="View Sponsored information or leave ad feedback"]')
                 except Exception as error:
-                    logger.info(f"no sponsored_span")
+                    logging.info(f"no sponsored_span")
                 asin = _div.get_attribute("data-asin")
                 if sponsored_span:
                     sponsored_list.append(asin)
@@ -234,13 +235,13 @@ class RunAsinRank(object):
             sponsored_dict = {str(_idx): _v for _idx, _v in enumerate(sponsored_list)}
             organic_dict = {str(_idx): _v for _idx, _v in enumerate(organic_list)}
 
-            logger.info("parse_asin success")
-            logger.info(f"sponsored_dict: {sponsored_dict}")
-            logger.info(f"organic_dict: {organic_dict}")
+            logging.info("parse_asin success")
+            logging.info(f"sponsored_dict: {sponsored_dict}")
+            logging.info(f"organic_dict: {organic_dict}")
             return sponsored_dict, organic_dict
 
         except Exception as error:
-            logger.exception(f"parse_asin error: {error}")
+            logging.exception(f"parse_asin error: {error}")
 
         return {}, {}
 
@@ -249,7 +250,7 @@ class RunAsinRank(object):
         搜索关键词
         :return:
         """
-        logger.info("search_keywords begin")
+        logging.info("search_keywords begin")
 
         try:
             button = WebDriverWait(self.driver, self.wait_time).until(
@@ -265,11 +266,11 @@ class RunAsinRank(object):
 
             sponsored_dict, organic_dict = self.parse_asin()
             if sponsored_dict or organic_dict:
-                logger.info("search_keywords success")
+                logging.info("search_keywords success")
                 return sponsored_dict, organic_dict
 
         except Exception as error:
-            logger.exception(f"search_keywords error: {error}")
+            logging.exception(f"search_keywords error: {error}")
 
         return {}, {}
 
@@ -278,7 +279,7 @@ class RunAsinRank(object):
         下一页
         :return:
         """
-        logger.info(f"search_keywords_next begin. page_num: {page_num}")
+        logging.info(f"search_keywords_next begin. page_num: {page_num}")
 
         try:
             button = WebDriverWait(self.driver, self.wait_time).until(
@@ -288,11 +289,11 @@ class RunAsinRank(object):
 
             sponsored_dict, organic_dict = self.parse_asin()
             if sponsored_dict or organic_dict:
-                logger.info("search_keywords_next success")
+                logging.info("search_keywords_next success")
                 return sponsored_dict, organic_dict
 
         except Exception as error:
-            logger.exception(f"search_keywords_next error: {error}")
+            logging.exception(f"search_keywords_next error: {error}")
 
         return {}, {}
 
@@ -328,7 +329,7 @@ class RunAsinRank(object):
                 "organic_dict": organic_dict
             }
 
-        logger.info(f"all_asin_dict: {all_asin_dict}")
+        logging.info(f"all_asin_dict: {all_asin_dict}")
         return all_asin_dict
 
     def save_excel(self, all_asin_dict, xlsx_file):
@@ -374,7 +375,7 @@ class RunAsinRank(object):
         if not os.path.exists(xlsx_file):
             # 文件不存在 - 创建新文件并写入数据
             df.to_excel(xlsx_file, sheet_name=sheet_name, index=False)
-            logger.info(f"文件 '{xlsx_file}' 已创建，数据写入工作表 '{sheet_name}'")
+            logging.info(f"文件 '{xlsx_file}' 已创建，数据写入工作表 '{sheet_name}'")
         else:
             # 文件存在 - 处理工作表
             try:
@@ -383,7 +384,7 @@ class RunAsinRank(object):
 
                 # 检查工作表是否存在
                 if sheet_name in book.sheetnames:
-                    logger.info(f"工作表 '{sheet_name}' 已存在，将在现有数据右侧空一列后添加新数据")
+                    logging.info(f"工作表 '{sheet_name}' 已存在，将在现有数据右侧空一列后添加新数据")
 
                     # 获取目标工作表
                     ws = book[sheet_name]
@@ -405,25 +406,25 @@ class RunAsinRank(object):
 
                     # 保存工作簿
                     book.save(xlsx_file)
-                    logger.info(f"成功在 '{sheet_name}' 工作表右侧空一列后添加 {len(df)} 列数据")
+                    logging.info(f"成功在 '{sheet_name}' 工作表右侧空一列后添加 {len(df)} 列数据")
 
                 else:
                     # 工作表不存在 - 创建新工作表并写入数据
                     # 使用pandas写入新工作表
                     with pd.ExcelWriter(xlsx_file, mode='a', engine='openpyxl') as writer:
                         df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    logger.info(f"工作表 '{sheet_name}' 不存在，已创建并写入数据")
+                    logging.info(f"工作表 '{sheet_name}' 不存在，已创建并写入数据")
 
             except Exception as e:
-                logger.info(f"操作失败: {str(e)}")
+                logging.info(f"操作失败: {str(e)}")
                 # 回退方案
                 try:
                     # 尝试使用pandas直接追加新工作表
                     with pd.ExcelWriter(xlsx_file, mode='a', engine='openpyxl') as writer:
                         df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    logger.info("使用回退方案成功写入数据")
+                    logging.info("使用回退方案成功写入数据")
                 except Exception as fallback_error:
-                    logger.info(f"回退方案也失败: {str(fallback_error)}")
+                    logging.info(f"回退方案也失败: {str(fallback_error)}")
 
     def main_run(self, zipcode, keywords, total_page_nums, xlsx_file):
         """
@@ -432,7 +433,7 @@ class RunAsinRank(object):
         """
         status = "failed"
         for _idx in range(3):
-            logger.info(f"main_run idx: {_idx}")
+            logging.info(f"main_run idx: {_idx}")
             all_asin_dict = self.run_asin(zipcode, keywords, total_page_nums)
             self.quit_driver()
 
@@ -441,20 +442,17 @@ class RunAsinRank(object):
                 status = "success"
                 break
 
-        logger.info(f"======== finish: {status} ========")
+        logging.info(f"======== finish: {status} ========")
 
 
 if __name__ == '__main__':
     _zipcode = "77429"
     _keywords = "pack and play mattress"
 
-    os_path = "/var/log"
-
-    log_file = os_path + "/run_asin_rank_{time:YYYY-MM-DD}.log"
-    logger.add(os_path + "/run_asin_rank_{time:YYYY-MM-DD}.log", rotation="00:00", retention="3 days")
+    config_log("run_asin_rank.log")
 
     today_str = datetime.datetime.now().strftime("%Y%m%d")
-    _xlsx_file = os_path + f"/{_keywords}_{_zipcode}_{today_str}.xlsx"
+    _xlsx_file = DATA_PATH + f"/{_keywords}_{_zipcode}_{today_str}.xlsx"
 
     _total_page_nums = 3
     obj = RunAsinRank()
