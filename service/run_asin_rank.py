@@ -17,7 +17,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 import selenium.webdriver.support.expected_conditions as ec
-from utils.config import DATA_PATH
+from setting.config import DATA_PATH
 from utils.logger import config_log
 
 
@@ -446,10 +446,10 @@ class RunAsinRank(object):
 
 
 if __name__ == '__main__':
+    config_log("run_asin_rank.log")
+
     _zipcode = "77429"
     _keywords = "pack and play mattress"
-
-    config_log("run_asin_rank.log")
 
     today_str = datetime.datetime.now().strftime("%Y%m%d")
     _xlsx_file = DATA_PATH + f"/{_keywords}_{_zipcode}_{today_str}.xlsx"

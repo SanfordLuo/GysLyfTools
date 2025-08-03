@@ -11,6 +11,9 @@ LOG_PATH = "/var/log/"
 # 数据路径
 DATA_PATH = "/var/data/"
 
+# 飞书机器人
+FS_ROBOT_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/c64e6ee0-a3d0-44c0-afd3-76784cdcdfc9"
+
 # MYSQL
 MYSQL_CONFIG = {
     # 私网：172.25.31.63
