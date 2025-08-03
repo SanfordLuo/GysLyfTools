@@ -75,7 +75,7 @@ class MonitorAsinReview(object):
             try:
                 with requests.Session(impersonate="chrome131") as session:
                     self.set_headers(session)
-                    self.set_proxy(session)
+                    # self.set_proxy(session)
                     response = session.get(url, timeout=self.timeout, verify=False)
                     logging.info(f"[request_asin_review response]: {response.status_code}")
 
