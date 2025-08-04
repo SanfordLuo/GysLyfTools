@@ -43,7 +43,7 @@ class MonitorAsinReview(object):
             "sec-fetch-mode": "navigate",
             "sec-fetch-user": "?1",
             "sec-fetch-dest": "document",
-            "accept-language": "zh-CN,zh;q=0.9",
+            "accept-language": "en-US,en;q=0.9",
             "priority": "u=0, i",
             "accept-encoding": "gzip, deflate, br, zstd"
         }
