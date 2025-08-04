@@ -264,6 +264,7 @@ class MonitorAsinReview(object):
 
         resp_tag, asin_url, resp_text = self.request_asin_review(asin)
         if resp_tag:
+            self.del_request_failed_incr(asin)
             rating, reviews = self.parse_review(resp_text)
             is_update = self.update_cache_review(asin, rating, reviews)
             if is_update:
