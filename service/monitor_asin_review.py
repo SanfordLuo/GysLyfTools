@@ -197,7 +197,7 @@ class MonitorAsinReview(object):
         :param asin:
         :return:
         """
-        is_update = False
+        fs_switch = False
         rating, reviews = 0, 0
         msg_status = "成功-评论无变化"
 
@@ -207,10 +207,13 @@ class MonitorAsinReview(object):
             is_update = self.update_cache_review(asin, rating, reviews)
             if is_update:
                 msg_status = "成功-评论有变化"
+                fs_switch = True
             if not rating or not reviews:
                 msg_status = "未解析到评论信息"
+                fs_switch = True
         else:
             msg_status = resp_text
+            fs_switch = True
 
         msg_dict = {
             "title": "商品评论数监控",
@@ -224,9 +227,9 @@ class MonitorAsinReview(object):
             }
         }
 
-        logging.info(f"is_update: {is_update}")
+        logging.info(f"fs_switch: {fs_switch}")
 
-        if is_update:
+        if fs_switch:
             send_fs_msg(msg_dict)
 
 
