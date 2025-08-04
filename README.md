@@ -12,6 +12,6 @@ git config user.email "SanfordLuo"
 ### monitor_asin_review
 
 ```
-3 * * * * export PYTHONPATH=/root/projects/GysLyfTools && nohup /root/projects/pyenv/bin/python /root/projects/GysLyfTools/service/monitor_asin_review.py >/dev/null 2>&1 &
+*/30 * * * * export PYTHONPATH=/root/projects/GysLyfTools && nohup /root/projects/pyenv/bin/python /root/projects/GysLyfTools/service/monitor_asin_review.py >/dev/null 2>&1 &
 ```
 

@@ -23,7 +23,7 @@ class MonitorAsinReview(object):
         self.timeout = 10
         self.retry = 3
         self.cache_stats_review_key = "STATS:REVIEW:{asin}"
-        self.cache_stats_review_exp = 60 * 60 * 24
+        self.cache_stats_review_exp = 60 * 60 * 24 - 60 * 5
 
     def set_headers(self, session):
         """
@@ -199,12 +199,14 @@ class MonitorAsinReview(object):
         """
         is_update = False
         rating, reviews = 0, 0
-        msg_status = "success"
+        msg_status = "成功-评论无变化"
 
         resp_tag, asin_url, resp_text = self.request_asin_review(asin)
         if resp_tag:
             rating, reviews = self.parse_review(resp_text)
             is_update = self.update_cache_review(asin, rating, reviews)
+            if is_update:
+                msg_status = "成功-评论有变化"
             if not rating or not reviews:
                 msg_status = "未解析到评论信息"
         else:
@@ -216,16 +218,16 @@ class MonitorAsinReview(object):
                 "ASIN": asin,
                 "商品链接": asin_url,
                 "当前评分": rating,
-                "当前评论总数": reviews,
-                "status": msg_status,
+                "当前评论数": reviews,
+                "监控状态": msg_status,
                 "主机名称": socket.gethostname()
             }
         }
 
         logging.info(f"is_update: {is_update}")
 
-        # if is_update:
-        send_fs_msg(msg_dict)
+        if is_update:
+            send_fs_msg(msg_dict)
 
 
 if __name__ == '__main__':
