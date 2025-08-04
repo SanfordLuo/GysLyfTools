@@ -7,6 +7,7 @@ https://www.amazon.com/dp/B0FBRM728Y
 import json
 import socket
 import logging
+import time
 import datetime
 from lxml import etree
 from curl_cffi import requests
@@ -20,10 +21,12 @@ class MonitorAsinReview(object):
     def __init__(self):
         self.setting = GlobalSetting.instance()
         self.redis_db_0 = self.setting.redis_db_0
-        self.timeout = 10
-        self.retry = 3
+        self.timeout = 15
+        self.retry = 5
         self.cache_stats_review_key = "STATS:REVIEW:{asin}"
         self.cache_stats_review_exp = 60 * 60 * 24 - 60 * 5
+        self.cache_request_failed_key = "INCR:REQUEST_FAILED:{asin}"
+        self.request_failed_incr_limit = 3
 
     def set_headers(self, session):
         """
@@ -107,21 +110,23 @@ class MonitorAsinReview(object):
         for _idx in range(self.retry):
             try:
                 with requests.Session(impersonate="chrome131") as session:
-                    self.set_headers(session)
-                    # self.set_proxy(session)
-                    response = session.get(url, timeout=self.timeout, verify=False)
-                    logging.info(f"[request_asin_review response]: {response.status_code}. {response.url}")
+                    for _ in range(2):
+                        time.sleep(3)
+                        self.set_headers(session)
+                        # self.set_proxy(session)
+                        response = session.get(url, timeout=self.timeout, verify=False)
+                        logging.info(f"[request_asin_review response]: {response.status_code}. {response.url}")
 
-                    if response.status_code == 404:
-                        logging.info(f"商品不存在")
-                        return False, url, "商品不存在"
+                        if response.status_code == 404:
+                            logging.info(f"商品不存在")
+                            return False, url, "商品不存在"
 
-                    elif response.status_code == 200:
-                        response = self.request_validate_captcha(url, session, response)
+                        elif response.status_code == 200:
+                            response = self.request_validate_captcha(url, session, response)
 
-                        doc = etree.HTML(response.text)
-                        if doc.xpath('//*[@id="acrCustomerReviewText"]'):
-                            return True, url, response.text
+                            doc = etree.HTML(response.text)
+                            if doc.xpath('//*[@id="acrCustomerReviewText"]'):
+                                return True, url, response.text
 
             except Exception as error:
                 logging.exception(f"[request_asin_review error]: {error}")
@@ -166,7 +171,7 @@ class MonitorAsinReview(object):
         for _idx in range(2):
             try:
                 cache_value = self.redis_db_0.get(cache_key)
-                logging.info(f"get_cache_review. cache_key: {cache_key}, cache_value: {cache_value}")
+                logging.info(f"get_cache_review. {cache_key}: {cache_value}")
                 if cache_value:
                     review_data = json.loads(cache_value)
                 break
@@ -184,12 +189,62 @@ class MonitorAsinReview(object):
             for _idx in range(2):
                 try:
                     self.redis_db_0.setex(name=cache_key, value=cache_value, time=self.cache_stats_review_exp)
-                    logging.info(f"set_cache_review. cache_key: {cache_key}, cache_value: {cache_value}")
+                    logging.info(f"set_cache_review. {cache_key}: {cache_value}")
                     break
                 except Exception as error:
-                    logging.exception(f"set_cache_review error: {error}")
+                    logging.exception(f"set_cache_review. error: {error}")
 
         return is_update
+
+    def get_request_failed_incr(self, asin):
+        """
+        :param asin:
+        :return:
+        """
+        cache_key = self.cache_request_failed_key.format(asin=asin)
+        for _idx in range(2):
+            try:
+                cache_value = self.redis_db_0.get(cache_key)
+                logging.info(f"get_request_failed_incr. {cache_key}: {cache_value}")
+                if cache_value:
+                    return int(cache_value)
+                return 0
+            except Exception as error:
+                logging.exception(f"get_request_failed_incr. error: {error}")
+
+        return 0
+
+    def add_request_failed_incr(self, asin):
+        """
+        :param asin:
+        :return:
+        """
+        cache_key = self.cache_request_failed_key.format(asin=asin)
+        for _idx in range(2):
+            try:
+                cache_value = self.redis_db_0.incr(cache_key)
+                logging.info(f"add_request_failed_incr. {cache_key}: {cache_value}")
+                return int(cache_value)
+            except Exception as error:
+                logging.exception(f"add_request_failed_incr. error: {error}")
+
+        return 0
+
+    def del_request_failed_incr(self, asin):
+        """
+        :param asin:
+        :return:
+        """
+        cache_key = self.cache_request_failed_key.format(asin=asin)
+        for _idx in range(2):
+            try:
+                cache_value = self.redis_db_0.delete(cache_key)
+                logging.info(f"del_request_failed_incr. {cache_key}: {cache_value}")
+                return
+            except Exception as error:
+                logging.exception(f"del_request_failed_incr. error: {error}")
+
+        return
 
     def run_monitor(self, asin):
         """
@@ -200,6 +255,12 @@ class MonitorAsinReview(object):
         fs_switch = False
         rating, reviews = 0, 0
         msg_status = "成功-评论无变化"
+
+        # 查询失败次数是否达上限
+        now_incr = self.get_request_failed_incr(asin)
+        if now_incr >= self.request_failed_incr_limit:
+            logging.info("请求失败次数达上限, 暂不执行")
+            return False
 
         resp_tag, asin_url, resp_text = self.request_asin_review(asin)
         if resp_tag:
@@ -213,7 +274,9 @@ class MonitorAsinReview(object):
                 fs_switch = True
         else:
             msg_status = resp_text
-            fs_switch = True
+            now_incr = self.add_request_failed_incr(asin)
+            if now_incr >= self.request_failed_incr_limit:
+                fs_switch = True
 
         msg_dict = {
             "title": "商品评论数监控",
