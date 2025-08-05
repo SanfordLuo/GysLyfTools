@@ -266,13 +266,15 @@ class MonitorAsinReview(object):
         if resp_tag:
             self.del_request_failed_incr(asin)
             rating, reviews = self.parse_review(resp_text)
-            is_update = self.update_cache_review(asin, rating, reviews)
-            if is_update:
-                msg_status = "成功-评论有变化"
-                fs_switch = True
             if not rating or not reviews:
                 msg_status = "未解析到评论信息"
                 fs_switch = True
+            else:
+                is_update = self.update_cache_review(asin, rating, reviews)
+                if is_update:
+                    msg_status = "成功-评论有变化"
+                    fs_switch = True
+
         else:
             msg_status = resp_text
             now_incr = self.add_request_failed_incr(asin)
