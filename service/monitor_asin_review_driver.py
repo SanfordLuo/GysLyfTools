@@ -315,7 +315,7 @@ if __name__ == '__main__':
     # 别人
     # _asin = "B0FBRM728Y"
     # 喵喵
-    _asin = "B0F7Y61Q6X"
+    _asin = "B0FLKC95G8"
 
     obj = MonitorAsinReviewDriver()
     obj.run_monitor(_asin)
